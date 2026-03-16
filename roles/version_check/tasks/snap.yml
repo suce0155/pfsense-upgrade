@@ -1,0 +1,19 @@
+- name: Create disk-only snapshot of pfSense VM
+  community.proxmox.proxmox_snap:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_token_id: "{{ proxmox_api_token_id }}"
+    api_token_secret: "{{ proxmox_api_token_secret }}"
+    validate_certs: "{{ proxmox_validate_certs }}"
+    vmid: "{{ vmid }}"
+    snapname: "{{ proxmox_snapname }}"
+    description: "Automated pfSense snapshot before changes"
+    state: present
+    vmstate: false
+  delegate_to: localhost
+  run_once: true
+  register: snapshot_result
+
+- name: Display snapshot result
+  ansible.builtin.debug:
+    var: snapshot_result

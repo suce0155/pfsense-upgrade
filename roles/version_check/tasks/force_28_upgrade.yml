@@ -1,0 +1,81 @@
+# SET CORRECT PY INTERPRETER
+- name: Detect newest working Python 3.7+ on pfSense
+  raw: |
+    for py in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3; do
+      if command -v "$py" >/dev/null 2>&1 && "$py" -c "import sys; sys.exit(0)" 2>/dev/null; then
+        command -v "$py"
+        exit 0
+      fi
+    done
+    echo "/usr/local/bin/python3"
+  register: python_detect
+  changed_when: false
+  ignore_errors: true
+
+- name: Set correct ansible_python_interpreter
+  set_fact:
+    ansible_python_interpreter: "{{ python_detect.stdout_lines | last | trim }}"
+  when: python_detect.stdout is defined and python_detect.stdout | length > 0
+
+# START THE 2.7.2 → 2.8.1 UPGRADE
+- name: 2.7.2 → 2.8.x upgrade
+  when:
+    - pfsense_version is version('2.7.2', '=')
+    - pfsense_version is version('2.8.0', '<')
+  block:
+    - name: Set 2.8.1 branch
+      delegate_to: localhost
+      become: false
+      vars:
+        build_dir: "{{ role_path }}/files"
+      ansible.builtin.command: >
+        python3 {{ build_dir }}/pfsense-2.8.1.py --host {{ inventory_hostname }} --port {{ fw_port }} --user {{ fw_user }} --passw {{ fw_passw }}
+      register: pfsense281_result
+
+    - name: Run pfSense online upgrade
+      ansible.builtin.shell: pfSense-upgrade -y
+      register: upgrade_result
+      changed_when: true
+      ignore_errors: yes
+      ignore_unreachable: yes
+
+    - name: Detect if this upgrade triggered a reboot
+      set_fact:
+        upgrade_rebooted: >-
+          {{ 'Rebooting' in upgrade_result.stdout or
+             'reboot' in upgrade_result.stdout | lower or
+             'will reboot' in upgrade_result.stdout | lower }}
+
+    - name: Wait for pfSense to come back online after reboot (if needed)
+      ansible.builtin.wait_for_connection:
+        delay: 90
+        timeout: 900
+        connect_timeout: 30
+        sleep: 15
+      when: upgrade_rebooted | bool
+
+    - name: Perform final cleanup reboot after full upgrade
+      ansible.builtin.reboot:
+        reboot_timeout: 600   # Seconds to wait for reboot to complete
+        connect_timeout: 30
+        msg: "Final cleanup reboot initiated by Ansible"
+
+    - name: Extra pause for pfSense services to fully initialize after reboot
+      ansible.builtin.pause:
+        seconds: 120
+
+    - name: Confirm final version after extra reboot
+      ansible.builtin.raw: cat /etc/version
+      register: pfsense_version_final_raw_new
+      changed_when: false
+      ignore_errors: false
+
+    - name: Normalize version again
+      set_fact:
+        pfsense_version: "{{ pfsense_version_final_raw_new.stdout | trim | split('-') | first }}"
+
+    - name: Show final pfSense version
+      debug:
+        msg: "Upgrade attempt {{ upgrade28_attempt }} completed → pfSense version {{ pfsense_version }}"
+        
+    

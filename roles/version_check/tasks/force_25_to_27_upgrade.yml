@@ -1,0 +1,63 @@
+# START THE 2.5.x → 2.7.x UPGRADE
+- name: Force 2.5.x → 2.7.x legacy upgrade
+  when:
+    - pfsense_version is version('2.5.0', '>=')
+    - pfsense_version is version('2.6.0', '<')
+  block:
+
+    - name: Run the big upgrade (this will reboot the box)
+      raw: |
+        PACKAGESITE="https://pkg.pfsense.org/pfSense_v2_5_0_amd64-pfSense_v2_5_0" \
+        SSL_NO_VERIFY_PEER=1 pfSense-upgrade -y
+      register: upgrade_result
+      changed_when: true
+      ignore_errors: yes
+      ignore_unreachable: yes
+
+    - name: Detect if this upgrade triggered a reboot
+      set_fact:
+        upgrade_rebooted: >-
+          {{ 'reboot' in (upgrade_result.stdout | lower) or
+             'rebooting' in (upgrade_result.stdout | lower) }}
+
+    - name: Perform final cleanup reboot after full upgrade
+      raw: shutdown -r now "Final cleanup reboot initiated by Ansible"
+      changed_when: true
+      ignore_errors: yes
+      ignore_unreachable: yes
+
+    - name: Wait for pfSense to shutdown (SSH goes away)
+      delegate_to: localhost
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        state: stopped
+        timeout: 300
+
+    - name: Wait for pfSense to boot up
+      delegate_to: localhost
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        delay: 30
+        timeout: 900
+      ignore_unreachable: yes
+      
+    - name: Extra pause for pfSense services to fully initialize after reboot
+      ansible.builtin.pause:
+        seconds: 120
+
+    - name: Re-read pfSense version
+      raw: cat /etc/version
+      register: pfsense_version_final_raw
+      changed_when: false
+
+    - name: Normalize version
+      set_fact:
+        pfsense_version: "{{ pfsense_version_final_raw.stdout | trim | split('-') | first }}"
+
+    - name: Show final pfSense version
+      debug:
+        msg: "Upgrade attempt {{ upgrade25_attempt }} completed → pfSense version {{ pfsense_version }}"
+
+    

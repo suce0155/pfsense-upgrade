@@ -1,0 +1,9 @@
+- name: Add Alias and SSH FW Rule
+  vars:
+    build_dir: "{{ role_path }}/files"
+  ansible.builtin.command: >
+    python3 {{ build_dir }}/add_fw_rule.py --host {{ inventory_hostname }} --port {{ fw_port }} --user {{ fw_user }} --passw {{ fw_passw }}
+  register: fw_script_result
+
+- debug:
+    msg: "add_fw_rule.py result: {{ fw_script_result.stdout }}"

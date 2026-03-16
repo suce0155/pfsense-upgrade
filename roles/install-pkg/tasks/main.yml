@@ -1,0 +1,8 @@
+- name: add package
+  ansible.builtin.command:
+    cmd: pkg-static add https://github.com/jaredhendrickson13/pfsense-api/releases/latest/download/pfSense-2.8.0-pkg-RESTAPI.pkg
+  register: result
+
+- name: Display command output
+  ansible.builtin.debug:
+    msg: "{{ result.stdout }}"

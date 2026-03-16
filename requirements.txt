@@ -1,0 +1,4 @@
+ansible
+requests
+beautifulsoup4
+urllib3

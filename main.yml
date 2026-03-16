@@ -1,0 +1,39 @@
+---
+- name: Check Ipsec for Older Encryption
+  hosts: pfsense
+  gather_facts: no
+  connection: local
+
+  roles:
+    - roles/check_ipsec
+
+- name: Enable SSH and Save Config Backup
+  hosts: pfsense
+  gather_facts: no
+  connection: local
+  roles:
+    - roles/enable_ssh
+
+- name: Add SSH Firewall Rule 
+  hosts: pfsense
+  gather_facts: no
+  connection: local
+
+  roles:
+    - roles/add_ssh_FWrule
+
+- name: Start pfSense Upgrade Loop
+  hosts: pfsense
+  gather_facts: no
+
+  roles:
+    - roles/version_check
+
+- name: Install pfSense REST API Package
+  hosts: pfsense
+  gather_facts: no
+
+  roles:
+    - roles/install-pkg
+
+     

@@ -1,0 +1,16 @@
+- name: Running enable_ssh.py on pfSense
+  vars:
+    build_dir: "{{ role_path }}/files"
+  ansible.builtin.command: >
+    python3 {{ build_dir }}/enable_ssh.py --host {{ inventory_hostname }} --port {{ fw_port }} --user {{ fw_user }} --passw {{ fw_passw }}
+  register: ssh_script_result
+
+- debug:
+    msg: "enable_ssh.py result: {{ ssh_script_result.stdout }}"
+
+- name: Wait for SSH service to become available on pfSense
+  ansible.builtin.wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 22
+    delay: 5
+    timeout: 120

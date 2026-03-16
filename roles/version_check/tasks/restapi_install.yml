@@ -1,0 +1,30 @@
+- name: Detect newest working Python 3.7+ on pfSense
+  raw: |
+    for py in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3; do
+      if command -v "$py" >/dev/null 2>&1 && "$py" -c "import sys; sys.exit(0)" 2>/dev/null; then
+        command -v "$py"
+        exit 0
+      fi
+    done
+    echo "/usr/local/bin/python3"
+  register: python_detect
+  changed_when: false
+  ignore_errors: true
+
+- name: Set correct ansible_python_interpreter
+  set_fact:
+    ansible_python_interpreter: "{{ python_detect.stdout_lines | last | trim }}"
+  when: python_detect.stdout is defined and python_detect.stdout | length > 0
+
+- name: Pfsense REST API Install
+  when:
+    - pfsense_version is version('2.8.0', '>=')
+  block:
+    - name: add package
+      ansible.builtin.command:
+        cmd: pkg-static add https://github.com/jaredhendrickson13/pfsense-api/releases/latest/download/pfSense-{{ pfsense_version }}-pkg-RESTAPI.pkg
+      register: result
+
+    - name: Display command output
+      ansible.builtin.debug:
+        msg: "{{ result.stdout }}"

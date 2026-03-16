@@ -1,0 +1,9 @@
+- name: Running check_ipsec.py on pfSense
+  vars:
+    build_dir: "{{ role_path }}/files"
+  ansible.builtin.command: >
+    python3 {{ build_dir }}/check_ipsec.py --host {{ inventory_hostname }} --port {{ fw_port }} --user {{ fw_user }} --passw {{ fw_passw }}
+  register: ipsec_script_result
+
+- debug:
+    msg: "check_ipsec.py result: {{ ipsec_script_result.stdout }}"

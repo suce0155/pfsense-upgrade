@@ -1,0 +1,8 @@
+proxmox_host: IP:8006
+proxmox_api_user: "ansible@pam"
+proxmox_api_token_id: "snapshot-token"
+proxmox_api_token_secret: "TOKEN_SECRET"
+proxmox_validate_certs: false
+fw_user: "admin"
+fw_passw: "pfsense"
+fw_port: "443"

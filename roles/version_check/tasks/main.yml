@@ -1,0 +1,104 @@
+---
+# GET RAW FROM SSH
+- name: Get raw pfSense version
+  raw: cat /etc/version
+  register: pfsense_version_raw
+  changed_when: false
+# STRIP THE VERSION
+- name: Normalize version – keep only X.Y.Z part (strip -RELEASE, -pX, etc.)
+  set_fact:
+    pfsense_version: "{{ pfsense_version_raw.stdout | trim | regex_search('([0-9]+\\.[0-9]+\\.[0-9]+)') }}"
+
+# SHOW PF VERSION
+- name: Show current (normalized) version
+  debug:
+    msg: "Current pfSense version: {{ pfsense_version }}"
+
+
+# MANUAL UPGRADE IF VERSION IS < 2.5.0
+- name: Fail if version is older than 2.5.0 → manual upgrade required
+  fail:
+    msg: |
+      Current version {{ pfsense_version }} is older than 2.5.0.
+      pfSense does not support automatic online upgrades from versions < 2.5.0.
+      Please upgrade manually to at least 2.5.0 first, then re-run this playbook.
+  when: pfsense_version is version('2.5.0', '<')
+
+# NO UPGRADE NEEDED FOR >= 2.8.0
+- name: Already at 2.8.0 or newer → nothing to do
+  include_tasks: restapi_install.yml
+  when: pfsense_version is version('2.8.0', '>=')
+
+
+# IF VERSION IS 2.5.X
+- name: Force 2.5.x → 2.7.x legacy upgrade
+  block:
+    - name: Take snapshot before 2.5.x → 2.7.x upgrade
+      include_tasks: snap.yml
+      vars:
+        proxmox_snapname: "pre-25-to-27-{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}"
+        proxmox_snapdesc: "Snapshot before legacy 2.5.x → 2.7.x upgrade on {{ inventory_hostname }}"
+
+    - name: Execute 2.5.x → 2.7.x upgrade steps
+      include_tasks: force_25_to_27_upgrade.yml
+      loop: "{{ range(1, 5) | list }}"
+      loop_control:
+        loop_var: upgrade25_attempt
+  when:
+    - pfsense_version is version('2.5.0', '>=')
+    - pfsense_version is version('2.6.0', '<')
+
+
+# IF VERSION IS 2.6.X
+- name: Force 2.6.x → 2.7.x upgrade
+  block:
+    - name: Take snapshot before 2.6.x → 2.7.x upgrade
+      include_tasks: snap.yml
+      vars:
+        proxmox_snapname: "pre-26-to-27-{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}"
+        proxmox_snapdesc: "Snapshot before 2.6.x → 2.7.x upgrade on {{ inventory_hostname }}"
+
+    - name: Execute 2.6.x → 2.7.x upgrade steps
+      include_tasks: upgrade_step.yml
+      loop: "{{ range(1, 5) | list }}"
+      loop_control:
+        loop_var: upgrade_attempt
+  when:
+    - pfsense_version is version('2.6.0', '>=')
+    - pfsense_version is version('2.7.0', '<')
+  
+# IF VERSION IS 2.7.0, 2.7.1
+- name: Force 2.7.x → 2.7.2 upgrade
+  block:
+    - name: Take snapshot before 2.7.x → 2.7.2 upgrade
+      include_tasks: snap.yml
+      vars:
+        proxmox_snapname: "pre-27-to-272-{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}"
+        proxmox_snapdesc: "Snapshot before 2.7.x → 2.7.2 upgrade on {{ inventory_hostname }}"
+
+    - name: Execute 2.7.x → 2.7.2 upgrade steps
+      include_tasks: force_272_upgrade.yml
+      loop: "{{ range(1, 5) | list }}"
+      loop_control:
+        loop_var: upgrade272_attempt
+  when:
+    - pfsense_version is version('2.7.0', '>=')
+    - pfsense_version is version('2.7.2', '<')
+
+# IF VERSION IS 2.7.2
+- name: Force 2.7.2 → 2.8.x upgrade
+  block:
+    - name: Take snapshot before 2.7.2 → 2.8.x upgrade
+      include_tasks: snap.yml
+      vars:
+        proxmox_snapname: "pre-272-to-28-{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}"
+        proxmox_snapdesc: "Snapshot before 2.7.2 → 2.8.x upgrade on {{ inventory_hostname }}"
+
+    - name: Execute 2.7.2 → 2.8.x upgrade steps
+      include_tasks: force_28_upgrade.yml
+      loop: "{{ range(1, 5) | list }}"
+      loop_control:
+        loop_var: upgrade28_attempt
+  when:
+    - pfsense_version is version('2.7.2', '=')
+    
