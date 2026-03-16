@@ -1,4 +1,4 @@
-# pfSense Automation with Ansible
+# Automate pfSense Upgrades Using Ansible
 
 This repository contains Ansible playbooks and roles for automating the configuration, management, and sequential upgrading of pfSense firewalls. It includes specialized support for pfSense instances hosted as Proxmox virtual machines, allowing for automated snapshots before major configuration changes or upgrades.
 
